@@ -1,0 +1,69 @@
+version: "3.8"
+
+services:
+  # Logstash 服務
+  logstash:
+    build: ./logstash
+    container_name: logstash
+    # Logstash 依賴 Elasticsearch 服務
+    depends_on:
+      - elasticsearch
+    # 將配置文件和 MySQL 驅動器映射到容器中
+    volumes:
+      - ./logstash/mysql-to-elk.conf:/config-dir/mysql-to-elk.conf
+      - ./logstash/mysql-connector-java-8.0.29.jar:/usr/share/logstash/mysql-connector/mysql-connector-java-8.0.29.jar
+      - ./logstash/query.sql:/config-dir/query.sql
+    env_file:
+      - ./.env
+    environment:
+      # 增加 worker 數量
+      - LS_PIPELINE_WORKERS=4
+      # 分批處理的配置，這裡設定每批處理的事件數量為 500，每批處理的延遲為 50 毫秒
+      - LS_PIPELINE_BATCH_SIZE=500
+      - LS_PIPELINE_BATCH_DELAY=50
+      # 啟用持久化佇列，並設定佇列的最大大小為 1 GB
+      # - LS_QUEUE_TYPE=persisted
+      # - LS_QUEUE_MAX_BYTES=1gb
+      # 啟用監控 logstash 狀態
+      - XPACK_MONITORING_ENABLED=true
+
+  # Elasticsearch 服務
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.7.0
+    container_name: elasticsearch
+    environment:
+      # 單節點 Elasticsearch 集群
+      - discovery.type=single-node
+      # 禁用 X-Pack 安全功能
+      - xpack.security.enabled=false
+      # 關閉內部通信的 SSL 加密
+      - xpack.security.transport.ssl.enabled=false
+      # 關閉 HTTP 通信的 SSL 加密
+      - xpack.security.http.ssl.enabled=false
+      # 啟用監控 Elasticsearch 狀態
+      - xpack.monitoring.collection.enabled=true
+      # 設置 Elasticsearch 的 JVM 堆大小, 通常設置為系統可用內存的一半, 官方建議最少 4 GB
+      - ES_JAVA_OPTS=-Xms4g -Xmx4g
+    # 將容器的端口映射到主機端口
+    ports:
+      - 9200:9200
+      - 9300:9300
+
+  # Kibana 服務
+  kibana:
+    image: docker.elastic.co/kibana/kibana:8.7.0
+    container_name: kibana
+    environment:
+      # 指定 Elasticsearch 服務的地址
+      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+    volumes:
+      - kibanadata:/usr/share/kibana/data
+    # 將容器的端口映射到主機端口
+    ports:
+      - 5601:5601
+    # Kibana 依賴 Elasticsearch 服務
+    depends_on:
+      - elasticsearch
+
+volumes:
+  kibanadata:

@@ -1,0 +1,19 @@
+# 使用官方 Logstash 8.7.0 映像作為基礎
+FROM docker.elastic.co/logstash/logstash:8.7.0
+
+# 將您的 Logstash 設定文件從主機複製到容器
+COPY mysql-to-elk.conf /config-dir/
+
+# 將 MySQL-connector JAR 從主機複製到容器
+COPY mysql-connector-java-8.0.29.jar /usr/share/logstash/mysql-connector/
+
+# 將 query.sql 和 .logstash_jdbc_last_run 從主機複製到容器
+COPY query.sql /config-dir/
+
+RUN touch /usr/share/logstash/.logstash_jdbc_last_run
+RUN chown logstash:logstash /usr/share/logstash/.logstash_jdbc_last_run
+# 寫入初始時間到 .logstash_jdbc_last_run
+RUN echo "2023-06-20T00:00:00Z" > /usr/share/logstash/.logstash_jdbc_last_run
+
+# 執行 Logstash，使用您的設定文件
+CMD ["-f", "/config-dir/mysql-to-elk.conf"]

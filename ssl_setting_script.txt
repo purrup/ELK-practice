@@ -1,0 +1,115 @@
+docker pull docker.elastic.co/elasticsearch/elasticsearch:8.7.0
+docker run -d --name elasticsearch -p 9200:9200 -p 9300:9300 -e "discovery.type=single-node" docker.elastic.co/elasticsearch/elasticsearch:8.7.0
+docker pull docker.elastic.co/logstash/logstash:8.7.0
+docker run -d --name logstash --link elasticsearch:elasticsearch -v C:\Users\user\Code\custom-logstash:/config-dir docker.elastic.co/logstash/logstash:8.7.0 -f /config-dir/mysql-to-elk.conf
+docker pull docker.elastic.co/kibana/kibana:8.7.0
+docker run -d --name kibana --link elasticsearch:elasticsearch -p 5601:5601 docker.elastic.co/kibana/kibana:8.7.0
+
+
+
+docker run -d --name logstash --link elasticsearch:elasticsearch \
+  -v C:\Users\user\Code\custom-logstash:/config-dir \
+  -v C:\Program Files (x86)\MySQL\MySQL Connector J 8.0\mysql-connector-java-8.0.29.jar:/usr/share/logstash/mysql-connector/mysql-connector-java-8.0.29.jar \
+  docker.elastic.co/logstash/logstash:8.7.0 \
+  -f /config-dir/mysql-to-elk.conf
+
+docker build -t logstash-mysql .
+
+
+
+# set password
+docker exec -it elasticsearch /usr/share/elasticsearch/bin/elasticsearch-reset-password -u password1234
+# generate token
+docker exec -it elasticsearch /usr/share/elasticsearch/bin/elasticsearch-create-enrollment-token -s kibana
+
+eyJ2ZXIiOiI4LjcuMCIsImFkciI6WyIxNzIuMTcuMC4yOjkyMDAiXSwiZmdyIjoiNjc3NjNhNzZkODczOGYwZWY2YTU5ZjZmYWNlMTY3NmVhNTM2ZTJkOTdmN2M4MmM0MTg4NTdlNzdhNTM4NjY3NCIsImtleSI6IjV3TzBlSWNCNTJQZ1gyTVVQLTlzOnFBdGdsWVN5VHg2REVKREwxQjFkdWcifQ==
+
+
+docker exec -it f8f41f912ef7 /bin/bash
+bin\kibana-verification-code.bat
+bin/elasticsearch-setup-passwords auto
+
+Changed password for user apm_system
+PASSWORD apm_system = uBSH7H6ThmOoDeAFwZ4P
+
+Changed password for user kibana_system
+PASSWORD kibana_system = ZMapPK7TXU8Eqcgarf9O
+
+Changed password for user kibana
+PASSWORD kibana = ZMapPK7TXU8Eqcgarf9O
+
+Changed password for user logstash_system
+PASSWORD logstash_system = 77NeSUyaKrRZaSLqDmst
+
+Changed password for user beats_system
+PASSWORD beats_system = bMTtj1cCXZ7wtqCypwDf
+
+Changed password for user remote_monitoring_user
+PASSWORD remote_monitoring_user = te60KFbF9JagwKufGqe6
+
+Changed password for user elastic
+PASSWORD elastic = wvXoTQb8AhcU7zmzPWud
+
+
+/etc/elasticsearch/certs/http_ca.crt
+
+find / -name "*.crt" 2>/dev/null
+
+docker cp elasticsearch:/usr/share/elasticsearch/config/certs/http_ca.crt C:\\Users\\user\\Code\\custom-logstash
+
+docker cp C:\\Users\\user\\Code\\custom-logstash\\http_ca.crt logstash:/usr/share/logstash/config/certs
+
+docker exec -it logstash chmod 644 /usr/share/logstash/config/certs/http_ca.crt
+
+/etc/ssl/certs/ca-certificates.crt
+/config-dir/http_ca.crt
+
+docker run -d --name elasticsearch -p 9200:9200 -p 9300:9300 -e "discovery.type=single-node" -v C:\Users\user\Code\elasticsearch\elasticsearch.yml:/usr/share/elasticsearch/config/elasticsearch.yml docker.elastic.co/elasticsearch/elasticsearch:8.7.0
+
+Error invoking remote method 'docker-start-container': Error: (HTTP code 500) server error - Cannot link to a non running container: /elasticsearch AS /kibana/elasticsearch
+
+
+
+dockerfile:
+# 使用官方 Logstash 8.7.0 映像作為基礎
+FROM docker.elastic.co/logstash/logstash:8.7.0
+
+# 將您的 Logstash 設定文件從主機複製到容器
+COPY mysql-to-elk.conf /config-dir/
+
+# 將 MySQL-connector JAR 從主機複製到容器
+COPY mysql-connector-java-8.0.29.jar /usr/share/logstash/mysql-connector/
+
+# 執行 Logstash，使用您的設定文件
+CMD ["-f", "/config-dir/mysql-to-elk.conf"]
+
+
+conf:
+input {
+  jdbc {
+    jdbc_driver_library => "/usr/share/logstash/mysql-connector/mysql-connector-java-8.0.29.jar"
+    jdbc_driver_class => "com.mysql.cj.jdbc.Driver"
+    jdbc_connection_string => "jdbc:mysql://127.0.0.1:3306/node_clog_api"
+    jdbc_user => "root"
+    jdbc_password => "root"
+    schedule => "* * * * *"
+    statement => "SELECT * FROM server_ap_log;"
+    use_column_value => true
+    tracking_column => "createtime"
+    tracking_column_type => "timestamp"
+  }
+}
+
+output {
+  elasticsearch {
+    hosts => ["http://elasticsearch:9200"]
+    index => "server_ap_log"
+    document_id => "%{id}"
+    ssl => false
+    user => "elastic"
+    password => "wvXoTQb8AhcU7zmzPWud"
+  }
+}
+
+docker command:
+docker run -d --name logstash --link elasticsearch:elasticsearch logstash

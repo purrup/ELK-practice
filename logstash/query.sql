@@ -1,0 +1,1 @@
+SELECT id, info, createtime, server_name, server_time, type FROM server_ap_log WHERE createtime >= :sql_last_value
